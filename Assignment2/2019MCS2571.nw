@@ -1,0 +1,406 @@
+\documentclass{article}
+\title{\textbf{\LARGE Constructing Binary Tree from only its Inorder Traversal}}
+\usepackage{noweb}
+\begin{document}
+\maketitle
+	
+\section{\LARGE Introduction}
+Normally more than one type of traversal are needed to reconstruct a binary tree. However, it can be recontructed from its preorder (or postorder) traversal with the help of some additional information as seen in the document "Rambling through woods on a Sunny morning".
+It requires one bit extra information with each node in its preorder (or postorder) traversal and hence, the tree can be reconstructed. But it cannot be reconstructed from its Inorder Traversal. 
+	
+Hence, we propose a new algorithm along with some additional information to reconstruct a binary tree from its inorder traversal only. 
+	
+\section{\LARGE Binary Tree Datatype Representation}
+In this algorithm, a user defined bintree datatype has been taken which can be used in ML like languages:
+	
+<<EmptyNode>>=
+datatype 'a bintree=Empty
+| Node of 'a * 'a bintree * 'a bintree;
+@
+	
+This basically creates a binary tree which can be either be Empty or will be a node whose value can be of any specific type and the left and right subtrees will either be binary subtrees or Empty.
+	
+\section{Additoional Binary Tree Functions}
+Some basic binary tree Functions are needed to be implemented in the Module to run the algorithm correctly. They are described as follows:
+	
+<<Root>>=
+fun root Empty = raise Emptybintree
+| root (Node (x, LST, RST)) = x;
+@
+	
+<<LST>>=
+fun leftSubtree Empty = raise Emptybintree
+| leftSubtree (Node (x, LST, RST)) = LST;
+@
+	
+<<RST>>=
+fun rightSubtree Empty = raise Emptybintree
+| rightSubtree (Node (x, LST, RST)) = RST;
+@
+	
+\section{\LARGE Constructing the Inorder Traversal List}
+To perform the reconstruction of the binary tree, the most important thing that we require is the inorder traversal of the tree which must include all the additional information required for each node for its reconstruction. The basic problem that we encountered in the "recover" document is that we could not establish the parent-child relationship between the nodes and hence it lead to such ambiguity that for the same inorder traversal, we could construct more than one binary tree.
+	
+Hence, for every node we have considered \textbf{additonal 2 bit} information and stored them inside a tuple along with the node value. The following are the information stored in the tuple for every node in the list: 
+	
+\begin{enumerate}
+\item \textbf{Node Value}: This field will contain the node value along with the option datatypee SOME for non-empty nodes. For empty nodes, it will contain the option datatype NONE.
+		
+\item \textbf{Child Direction Indicator}: This field will specify whether the node is a left child of its parent or right child of its parent or it itself is the root of the tree. The directions have been encoded as follows: 
+		
+\begin{itemize}
+\item 0: If the node is a left child of its parent.
+\item 1: If the node is a right child of its parent.
+\item 2: If the node itself is the Root of the tree.	
+\end{itemize}
+		
+\item  \textbf{Leaf or Non-leaf}: This field indicates if the node is a leaf node or non-leaf node. The information has been encoded as follows:
+		
+\begin{itemize}
+\item 0: If the node is a leaf node.
+\item 1: If the node is a non-leaf node.	
+\end{itemize}
+	
+\end{enumerate}
+
+The funtion for inorder traversal of the binary tree has been implemented as a tail recursive function as given below:
+	
+<<Inorder>>=
+local fun ino (Empty, Llist, 0) = (NONE,0,0) :: Llist
+| ino (Empty, Llist, 1) = (NONE,1,0) :: Llist
+| ino (Empty, Llist, 2) = Llist
+| ino (Node (N, Empty, Empty), Llist, 0) =      (NONE,0,0) :: ((SOME N, 0, 0) :: ((NONE, 1, 0) :: Llist))
+| ino (Node (N, Empty, Empty), Llist, 1) =      (NONE,0,0) :: ((SOME N, 1, 0) :: ((NONE, 1, 0) :: Llist))
+| ino (Node (N, LST, RST), Llist, 0) =
+let     val Mlist = ino (RST, Llist, 1)
+val Nlist = ino (LST, (SOME N, 0, 1)::Mlist, 0)
+in Nlist
+end
+| ino (Node (N, LST, RST), Llist, 1) =
+let     val Mlist = ino (RST, Llist, 1)
+val Nlist = ino (LST, (SOME N, 1, 1)::Mlist, 0)
+in Nlist
+end
+| ino (Node (N, LST, RST), Llist, 2) =
+let     val Mlist = ino (RST, Llist, 1)
+val Nlist = ino (LST, (SOME N, 2, 1)::Mlist, 0)
+in Nlist
+end
+in fun inorder T = ino (T, [], 2)
+end;
+@
+	
+The basic idea behind this implementation is that we need to establish the relationship between each node with its child node and also each node with its parent node. By taking the direction of each node with respect to its parent, we can identify if a node should be added at the left hand side of its parent or the right hand child of its parent. This will help us in avoiding ambiguity of insertion at each parent.
+	
+\section{\LARGE \textbf{Algorithm}}
+To store the structural information, we need to understand the following facts about inorder traversals:
+	
+\subsection*{Facts about Inorder Traversal}
+\begin{enumerate}
+\item No traversal can yield an empty list. The Empty tree yields [$\perp$] as the result of each traversal. Each $\perp$ is an Empty sub-tree.
+		
+\item No traversal can yield a list of length 2. We need at least 3 elements for the list to be a valid traversal.
+		
+\item Any element m $\ne$ $\perp$ in any traversal is the root of a subtree (could possibly be a leaf node too).
+		
+\item The in-order traversal of each subtree of a tree is a slice of the in-order traversal respectively of the whole tree.
+		
+\item Every leaf node l of the tree (denoting the subtree Node (l, Empty, Empty)) occurs as a slice of the
+		form [$\perp$, l, $\perp$].
+		
+\item Every non-$\perp$ element in any traversal is the root of a sub-tree of the original tree.
+		
+\end{enumerate}
+
+We denote slices in a traversal that result in subtrees by an ordered pair of indices called closed index interval (CII). Given a list of length n $>$ 0 representing a tree traversal of node-labels and $\perp$ we then have the following
+observations. Let I(n) = {(i,j,d) $|$ 0 $<=$ i  $<=$ j $<$ n} denote the set of all non-empty closed index intervals of slices of a list L of length n $>$ 0 where d indicates whether the subtree represented by this CII is a left subtree of its parent or a right subtree of its parent. For any valid index i, 0 $<=$ i $<$ n, L$_i$ denotes the element in L at index i.  Then we have
+\begin{enumerate}
+\item A CII of the form (i, i, d) can only represent an Empty subtree and that too provided L$_i$ = $\perp$ where d denotes whether the Empty subtree is the left or right child of its parent.
+			
+\item No CII of the form (i, i + 1,d) can represent a valid sub-tree.
+			
+\item Every leaf node is represented by a CII (i, j, d) where j = i + 2, in a inorder traversal provided L$_i$ $\ne$ $\perp$, L$_i$ = L$_j$ = $\perp$.
+			
+\item Given 0 $<=$ i$<=$ j $<$ k $<=$ m $<$ n with (i, j, d1) and (k, m, d2) representing valid subtrees T$_(i,j)$ and T$_(k,m)$ of the
+original tree respectively, (i, j, d1) and (k, m, d2) are neighbours (more precisely (i, j, d1) is the left neighbour and
+(k, m, d2) is the right neighbour) in a inorder traversal if k = j+2, d1 = 0, d2 = 1 and L$_(j+1)$ $\ne$ $\perp$.
+			
+\item Given neighbours (i, j, d1) and (k, m, d2), representing subtrees T$_(i,j)$ and T$_(k,m)$ of the original tree respectively; then if L$_(j+1)$ = h $\ne$ $\perp$ and CII of L$_(j+1)$ is (j+1,k-1,d3), then (i,m,d3) is the CII representing the subtree Node(h, T(i,j,d1), T(k,m,d2)) = T(i,m,d3).
+\end{enumerate}
+	
+\subsection{Steps of Algorithm}
+\begin{enumerate}
+\item Find the indices of all $\perp$ elements in P and express them as CIIs i.e. as ordered pairs of the form (i, i, d) where i, 0 $<=$ i $<$ n, is the index of a $\perp$ element. Let this be list "Nones" of ordered pairs representing Empty subtrees.
+			
+\item \textbf{Recursively}
+\begin{enumerate}
+\item Find all pairs of neighbours (i, j,d1), (k, m,d2) with 0 $<=$ i $<=$ j $<$ k $<=$ m $<$ n such that k = j + 2 and L$_(j+1)$ $\ne$ $\perp$ in the list II and d1 = 0 and d2 = 1. This would require looking up Nones for the value at index j + 1 respectively to determine neighbourhood.
+\item Join neighbours (i, j,d1), (k, m, d2) to form the CII (p, q, d) where (p, q) = (i, m) and d = direction component at L$_(j+1)$ such that both (i, j) and (k, m) are nested (p, q). In fact, the CII so formed is longer than the sum of the lengths of the CIIs (i, j,d1) and (k, m,d2).
+\end{enumerate}
+\textbf{until}
+			
+\begin{itemize}
+\item Nones reduces to single element lists (0, n $minus$ 1, 2), in which case it is indeed a valid traversal.
+				
+\item It is an invalid traversal.
+\end{itemize} 
+\end{enumerate}
+	
+\section{Implementation of the Algorithm}
+The algorithm is implemented using the following functions:
+	 
+\subsection{Constructing Empty Nodes}
+<<findEmpties>>=
+fun findEmptiesIter([],n,Lis) = Lis
+| findEmptiesIter(II,n,Lis) = (case hd(II) of
+(NONE:int option,s,c) => findEmptiesIter(tl(II),n-1,(Node (((n,n,s),NONE: int option), Empty, Empty)) :: Lis)
+|(SOME v,s,c) => findEmptiesIter(tl(II),n-1,Lis)
+);
+@
+	 
+The above function is used to insert the CIIs of every $\perp$ node along with its node value which together form individual sub-binarytrees.
+	 
+\subsection{Checking neighbouring nodes using CIIs}
+<<checkNeightbours>>=
+fun areNeighboursP1 ((i,j,cl), (k,m,cr), arI) =
+let     val inRange = (i >= 0) andalso (j >= 0) andalso
+(k >= 0) andalso (m >= 0)
+in      if inRange
+then
+if (i>=0) andalso (i<=j) andalso (j<=k) andalso (k<= m) andalso (cl = 0) andalso (cr = 1)
+then
+(case Array.sub(arI,j+1) of
+(NONE:int option,s,c) => false
+|(SOME v,s,c) => (k=j+2)
+)
+else false
+else raise OutofRange
+end;
+@ 
+	 
+This function checks if the nodes belonging to two CIIs are neighbours. It returns true or false based on the result.
+	 
+\subsection{Joining the neighbouring nodes with their root to form a subtree}
+<<joinNeighbours>>=
+local
+fun joinNeighboursP ([],arI) = []
+| joinNeighboursP ([bt],arI) = [bt]
+| joinNeighboursP ((bt0::(bt1::btList1)),arI) =
+let     val ((i,j,cl), rootval0) = root bt0
+val ((k,m,cr), rootval1) = root bt1
+in      if areNeighboursP1((i,j,cl), (k,m,cr),arI)
+then
+let
+val side=
+(case Array.sub(arI,j+1) of (v,s,c) => s )
+val cii = (i, m, side)
+val rt=
+(case Array.sub(arI,j+1) of (v,s,c) => v )
+val bt = Node ((cii, rt), bt0, bt1)
+in
+bt::(joinNeighboursP (btList1,arI))
+end
+else if null (btList1) then raise InvalidInorderTraversal
+else
+bt0::(joinNeighboursP ((bt1::btList1),arI))
+end
+in
+fun keepJoiningNeighboursP ([],arI) = raise InvalidInorderTraversal
+| keepJoiningNeighboursP ([bt],arI) = bt
+| keepJoiningNeighboursP (btList,arI) =
+let     val btList1 = joinNeighboursP (btList,arI)
+in      keepJoiningNeighboursP (btList1,arI)
+end
+end;
+@
+	 
+The above function combines the two neighbours with their root and forms a subtree. This subtree is inserted into the list of subtrees along with its CII.
+	 
+\subsection{Removing SOME,NONE and CIIs from node values}
+<<removeIndices>>=
+fun eraseIndices Empty = raise Emptybintree
+| eraseIndices (Node (((i, j, k), NONE: int option), Empty, Empty)) =
+if (i=j) then Empty
+else raise UnexpectedEmptyNode
+| eraseIndices (Node (((i, j, k), x), LST, RST)) =
+let     val left = eraseIndices LST
+val right = eraseIndices RST
+in ( case x of
+NONE => raise UnexpectedNodeValue
+| SOME y => Node (y, left, right)
+)
+end;
+@
+	 
+This function removes the CIIs and option datatypes from the indidual nodes to construct individual binary tree nodes and subtrees.
+	 
+All these combinely are called in a function inorderInverse() to construct a binary tree from a given inorder traversal list of the specified format.
+	 
+<<InorderInverse>>=
+fun inorderInverse [] = raise InvalidInorderTraversal
+| inorderInverse [(NONE,0,0)] = Empty
+| inorderInverse [(NONE,0,0),(SOME x,0,0),(NONE,0,0)] = Node (x, Empty, Empty)
+| inorderInverse II =
+let     val arI = Array.fromList II
+val n = Array.length arI
+val nones = findEmptiesIter (rev(II),n-1,[])
+val bt = keepJoiningNeighboursP (nones, arI)
+in eraseIndices bt
+end;
+@ 
+
+\section{Binary Tree Module}
+We construct a binary tree module which contains the signature and structure  of the binary tree datatype and all the functions required to achieve the given inorder traversal inverse to construct a unique binary tree.
+
+<<StructureBinTree-Complete>>=
+signature BINTREE =
+sig
+datatype 'a bintree =   Empty |
+Node of 'a * 'a bintree * 'a bintree
+exception Emptybintree
+exception InvalidInorderTraversal
+exception OutofRange
+exception UnexpectedEmptyNode
+exception UnexpectedNodeValue
+val root : 'a bintree -> 'a
+val leftSubtree : 'a bintree -> 'a bintree
+val rightSubtree: 'a bintree -> 'a bintree
+val inorder : 'a bintree -> ('a option * int * int) list
+val findEmptiesIter : (int option * 'a * 'b) list * int * ((int * int * 'a) * int option) bintree list -> ((int * int * 'a) * int option) bintree list
+val areNeighboursP1  : (int * int * int) * (int * int * int) * (int option * 'a * 'b) array -> bool
+val keepJoiningNeighboursP  : ((int * int * int) * int option) bintree list * (int option * int * 'a) array -> ((int * int * int) * int option) bintree
+val eraseIndices  : ((''a * ''a * 'b) * int option) bintree -> int bintree
+val inorderInverse  : (int option * int * int) list -> int bintree
+end(*sig*)
+
+structure Bintree : BINTREE =
+struct
+<<EmptyNode>>
+exception Emptybintree;
+exception InvalidInorderTraversal;
+exception OutofRange;
+exception UnexpectedEmptyNode;
+exception UnexpectedNodeValue;
+<<Root>>
+<<LST>>
+<<RST>>
+<<Inorder>>
+<<findEmpties>>
+<<checkNeightbours>>
+<<joinNeighbours>>
+<<removeIndices>>
+<<InorderInverse>>
+end
+@
+
+\section{Test Cases}
+The following are the results of different operations performed on the algorithm:
+
+\begin{itemize}
+\item \textbf{Creating Binary tree}: 
+
+<<NewBinaryTree>>=
+Standard ML of New Jersey v110.91 [built: Sun Jul 28 13:44:51 2019]
+[opening 2019MCS2571.sml]
+[autoloading]
+[library $SMLNJ-BASIS/basis.cm is stable]
+[library $SMLNJ-BASIS/(basis.cm):basis-common.cm is stable]
+[autoloading done]
+2019MCS2571.sml:116.6 Warning: calling polyEqual
+2019MCS2571.sml:36.11-55.4 Warning: match nonexhaustive
+(Empty,Llist,0) => ...
+(Empty,Llist,1) => ...
+(Empty,Llist,2) => ...
+(Node (N,Empty,Empty),Llist,0) => ...
+(Node (N,Empty,Empty),Llist,1) => ...
+(Node (N,LST,RST),Llist,0) => ...
+(Node (N,LST,RST),Llist,1) => ...
+(Node (N,LST,RST),Llist,2) => ...
+signature BINTREE =
+sig
+datatype 'a bintree = Empty | Node of 'a * 'a bintree * 'a bintree
+exception Emptybintree
+exception InvalidInorderTraversal
+exception OutofRange
+exception UnexpectedEmptyNode
+exception UnexpectedNodeValue
+val root : 'a bintree -> 'a
+val leftSubtree : 'a bintree -> 'a bintree
+val rightSubtree : 'a bintree -> 'a bintree
+val inorder : 'a bintree -> ('a option * int * int) list
+val findEmptiesIter : (int option * 'a * 'b) list * int * ((int * int * 'a) * int option) bintree list -> ((int * int * 'a) * int option) bintree list
+val areNeighboursP1 : (int * int * int) * (int * int * int) * 
+(int option * 'a * 'b) array
+-> bool
+val keepJoiningNeighboursP : ((int * int * int) * int option) bintree list
+* (int option * int * 'a) array
+-> ((int * int * int) * int option) bintree
+val eraseIndices : ((''a * ''a * 'b) * int option) bintree -> int bintree
+val inorderInverse : (int option * int * int) list -> int bintree
+end
+structure Bintree : BINTREE
+- open Bintree;
+opening Bintree
+datatype 'a bintree = Empty | Node of 'a * 'a bintree * 'a bintree
+exception Emptybintree
+exception InvalidInorderTraversal
+exception OutofRange
+exception UnexpectedEmptyNode
+exception UnexpectedNodeValue
+val root : 'a bintree -> 'a
+val leftSubtree : 'a bintree -> 'a bintree
+val rightSubtree : 'a bintree -> 'a bintree
+val inorder : 'a bintree -> ('a option * int * int) list
+val findEmptiesIter : (int option * 'a * 'b) list * int * ((int * int * 'a) * int option) bintree list -> ((int * int * 'a) * int option) bintree list
+val areNeighboursP1 : (int * int * int) * (int * int * int) * 
+(int option * 'a * 'b) array
+-> bool
+val keepJoiningNeighboursP : ((int * int * int) * int option) bintree list
+* (int option * int * 'a) array
+-> ((int * int * int) * int option) bintree
+val eraseIndices : ((''a * ''a * 'b) * int option) bintree -> int bintree
+val inorderInverse : (int option * int * int) list -> int bintree
+val t7 = Node (7, Empty, Empty);
+val t7 = Node (7,Empty,Empty) : int bintree
+- val t6 = Node (6, t7, Empty);
+val t6 = Node (6,Node (7,Empty,Empty),Empty) : int bintree
+- val t5 = Node (5, Empty, Empty);
+val t5 = Node (5,Empty,Empty) : int bintree
+- val t4 = Node (4, Empty, Empty);
+val t4 = Node (4,Empty,Empty) : int bintree
+- val t3 = Node (3, t5, t6);
+val t3 = Node (3,Node (5,Empty,Empty),Node (6,Node #,Empty)) : int bintree
+- val t2 = Node (2, Empty, t4);
+val t2 = Node (2,Empty,Node (4,Empty,Empty)) : int bintree
+- val t1 = Node (1, t2, t3);
+val t1 = Node (1,Node (2,Empty,Node #),Node (3,Node #,Node #)) : int bintree
+- 
+- 
+- t1;
+val it = Node (1,Node (2,Empty,Node #),Node (3,Node #,Node #)) : int bintree
+@
+
+\item \textbf{Generating Inorder Traversal List}
+<<InorderList>>=
+val II = inorder t1;
+val II =
+[(NONE,0,0),(SOME 2,0,1),(NONE,0,0),(SOME 4,1,0),(NONE,1,0),(SOME 1,2,1),
+(NONE,0,0),(SOME 5,0,0),(NONE,1,0),(SOME 3,1,1),(NONE,0,0),(SOME 7,0,0),
+...] : (int option * int * int) list
+@
+
+\item \textbf{Reconstructing Binary Tree from the above Traversal}
+<<Reconstruction>>=
+val btree = inorderInverse II;
+val btree = Node (1,Node (2,Empty,Node #),Node (3,Node #,Node #))
+: int bintree
+@
+
+\item \textbf{Verifying if the reconstructed binary tree is the same as the input binary tree}
+<<Verification>>=
+val tval = (btree = t1);
+val tval = true : bool
+@
+\end{itemize}
+
+\end{document}
